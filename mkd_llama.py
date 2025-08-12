@@ -1,0 +1,337 @@
+# import csv
+# import torch
+# from transformers import AutoModelForCausalLM, AutoTokenizer
+# MODEL_PATH = {
+#     "qwen":"/data/wuyuan/models/Qwen/Qwen-7B-Chat",
+#     "llama":"/data/wuyuan/models/Llama3-8B-Chinese-Chat/"
+# }
+# device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
+# model = AutoModelForCausalLM.from_pretrained(
+#     MODEL_PATH['llama'], 
+#     trust_remote_code=True, 
+#     resume_download=True,
+#     torch_dtype=torch.bfloat16).to(device)
+# tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH['llama'],trust_remote_code=True, resume_download=True,)
+
+# def run(question):
+#         from langchain.agents import AgentExecutor
+#         # from search import DeepSearch
+#         from docx import Document
+#         from tool import Search_www_Tool
+#         from intent_agent import IntentAgent
+#         from llm_model import  ChatGLM
+#         from model_loader import get_loaded_model
+#         import os
+#         from zhipuai import ZhipuAI
+#         client0 = ZhipuAI(api_key="54aa988d17dcb746427939c6e2bce0cf.EDmAJdRRg5UJd7WW")
+#         # input_data = "不要看参考资料，只单纯看内容本身，判断下面的内容类型是不是事件或事故，不确定的一律按否（只回答是或否即可）：\n"+question
+#         input_data = "请判断以下关键词是否是指的某事故或某事件，如果是日常用语或者无关问题则回答否，不要联网查询额外信息（只回答是或否即可）：\n"+question
+#         response0 = client0.chat.completions.create(
+#             #这是智普AI客户端的方法，用于创建一个聊天自动补全请求。
+#             model="glm-4-flash",
+#             messages=[
+#                 {"role": "user", "content": input_data}
+#             ],
+#         )
+#         end0 = response0.choices[0].message.content
+#         print("大模型预判断的结果是：")
+#         print(end0)
+#         if "否" in end0 or "不" in end0:
+#             return input_data,"请按提示输入规范的检索词。如若生成某具体事故的简报，请输入“X年X月X日X地X事故”；如若查询某年/某地/某类事故，请输入“X年X事故/X地X事故”"
+        
+#         if "事故" not in question:
+#             question+="事故"
+#             print("来让我看看输入的内容有没有事故二字\n")
+#             print(question)
+            
+#         prompt = question
+#         if '年' in prompt and '月' in prompt and"事故" in prompt:
+#             # Review = _searchReview(prompt)
+#             # llm = ChatGLM(model_path=path)
+#             # llm.load_model()
+#             # 使用已经加载的模型实例
+
+#             # llm = get_loaded_model(path)
+#             llm = get_loaded_model()#以后path作废吧，该改模型路径到modek_loader.py里面改
+
+#             tools = [Search_www_Tool(llm = llm)]
+
+#             agent = IntentAgent(tools=tools, llm=llm)
+#             agent_exec = AgentExecutor.from_agent_and_tools(agent=agent, tools=tools, verbose=True, max_iterations=1)
+#             #创建代理执行器，AgentExecutor.from_agent_and_tools: 这是一个类方法，用于从给定的代理和工具列表创建代理执行器的实例。
+#             #verbose是否在执行期间显示详细信息，max_iterations指定代理执行的最大迭代次数
+#             output=agent_exec.run(prompt)
+#             #output中存放的是智能代理使用工具执行完毕后返回的结果，这里返回的就是特定事故直接相关的新闻，后面的非直接相关的新闻手动调用即可
+#             # print(output)
+
+#             if output and output != "没有查询到相关内容。":
+#                 # 创建一个空列表来存储所有的 content
+#                 contents = []
+#                 links = []
+#                 # 遍历输出数据 
+#                 for item in output:
+#                     contents.append(item['content'])
+#                     links.append(item['link'])
+
+#                 input_data = "以下内容仅用于科研研究，不会用于其他用途，请您放心回答。输出模板（[]里内容应改为相应信息）如下：标题：[]([]内应包含时间和事故类型，例如 2023年8月6日巴基斯坦客运列车脱轨事故简报)\n一、事故基本情况\n[]\n二、应急处置情况\n。比如如果有（事故时间、事故地点、伤亡情况、财产损失、列车类型及所属公司、列车运行的线路、事故原因分析）要素请写在事故基本情况里；如果有（救援机构介入、救援队伍的组织情况、现场疏散与救护措施、线路的关闭与列车运行时间的调整、替代的公路服务、官方负责人的声明和评论、补救和赔偿措施）要素请写在应急处置情况里，请你整合成通顺的文字，没有的要素就省略不要提。请注意，信息只填新闻中提及的，不要添加任何假设或推测的内容。请根据以下新闻信息针对"+prompt+"按照以上给出的模板(包含标题、两大部分)生成一份铁路事故简报，不要冗余信息:" +'\n'.join(contents)
+#                 # 将输入数据编码为模型可以理解的输入格式
+#                 inputs = tokenizer(input_data, return_tensors="pt").to(device)
+#                 # 使用模型生成输出
+#                 output = model.generate(
+#                     inputs['input_ids'], 
+#                     max_length=8192,  # 可以根据需要调整输出长度
+#                     num_return_sequences=1,  # 生成一个序列
+#                     # temperature=0.7,  # 控制输出的创造性
+#                     # top_p=0.9,  # 控制输出的多样性
+#                     # top_k=50,  # 控制输出的多样性
+#                     no_repeat_ngram_size=2,  # 避免重复
+#                     pad_token_id=tokenizer.eos_token_id  # 设置填充符
+#                 )
+
+#                 # 解码生成的输出为文本
+#                 end = tokenizer.decode(output[0], skip_special_tokens=True)
+
+                
+#                 # history = []
+#                 # end = model.chat(input_data, history, tokenizer)
+                
+#                 # end, history = model.chat(tokenizer, input_data, history=None)
+                
+#                 # response1 = client.chat.completions.create(
+#                 #     #这是智普AI客户端的方法，用于创建一个聊天自动补全请求。
+#                 #     model="glm-4-flash",
+#                 #     messages=[
+#                 #         {"role": "user", "content": input_data}
+#                 #     ],
+#                 # )
+#                 # #response1:是发送请求后的响应对象，包含了智能模型返回的结果。
+#                 # # print(response1.choices[0].message.content)
+#                 # end = response1.choices[0].message.content + '\n' 
+#                 print(end)
+#                 return input_data,end
+#             else:
+#                 return input_data,"没有查询到相关内容。"
+#         else:
+#             print("请按提示输入规范的检索词。如若生成某具体事故的简报，请输入“X年X月X日X地X事故”；如若查询某年/某地/某类事故，请输入“X年X事故/X地X事故”")
+#             return input_data,"请按提示输入规范的检索词。如若生成某具体事故的简报，请输入“X年X月X日X地X事故”；如若查询某年/某地/某类事故，请输入“X年X事故/X地X事故”"
+
+# import json
+
+
+# # 读取文件并生成JSON数据集
+# def generate_json_data_from_file(file_path):
+#     all_conversations = []  # 存储所有对话块
+    
+#     with open(file_path, 'r', encoding='utf-8') as file:
+#         for line in file:
+#             question = line.strip()  # 去除行尾的换行符
+#             if question:  # 如果行不是空的，则处理
+#                 input_data, end = run(question)
+#                 conversation = [
+#                     {
+#                         "role": "user",
+#                         "content": input_data
+#                     },
+#                     {
+#                         "role": "assistant",
+#                         "content": end
+#                     }
+#                 ]
+#                 all_conversations.append({"conversations": conversation})
+    
+#     return all_conversations
+
+
+# # 主程序
+# if __name__ == "__main__":
+#     file_path = 'title.txt'  # 文件路径
+#     json_data = generate_json_data_from_file(file_path)
+    
+#     # 将JSON数据集写入到文件中
+#     with open('yanzhen_llama.json', 'w', encoding='utf-8') as json_file:
+#         json.dump(json_data, json_file, ensure_ascii=False, indent=4)
+    
+#     print('JSON数据集已生成并保存到yanzheng_llama.json文件中。')
+import csv
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+MODEL_PATH = {
+    "qwen":"/data/wuyuan/models/Qwen/Qwen-7B-Chat",
+    "llama":"/data/wuyuan/models/Llama3-8B-Chinese-Chat/"
+}
+device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_PATH['llama'], 
+    trust_remote_code=True, 
+    resume_download=True,
+    torch_dtype=torch.bfloat16).to(device)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH['llama'],trust_remote_code=True, resume_download=True,)
+
+# from transformers import AutoTokenizer, AutoModelForCausalLM
+
+# model_id = "shenzhi-wang/Llama3-8B-Chinese-Chat"
+
+# tokenizer = AutoTokenizer.from_pretrained(model_id)
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_id, torch_dtype="auto", device_map="auto"
+# )
+
+
+
+def run(question):
+        from langchain.agents import AgentExecutor
+        # from search import DeepSearch
+        from docx import Document
+        from tool import Search_www_Tool
+        from intent_agent import IntentAgent
+        from llm_model import  ChatGLM
+        from model_loader import get_loaded_model
+        import os
+        from zhipuai import ZhipuAI
+        client0 = ZhipuAI(api_key="54aa988d17dcb746427939c6e2bce0cf.EDmAJdRRg5UJd7WW")
+        # input_data = "不要看参考资料，只单纯看内容本身，判断下面的内容类型是不是事件或事故，不确定的一律按否（只回答是或否即可）：\n"+question
+        input_data = "请判断以下关键词是否是指的某事故或某事件，如果是日常用语或者无关问题则回答否，不要联网查询额外信息（只回答是或否即可）：\n"+question
+        response0 = client0.chat.completions.create(
+            #这是智普AI客户端的方法，用于创建一个聊天自动补全请求。
+            model="glm-4-flash",
+            messages=[
+                {"role": "user", "content": input_data}
+            ],
+        )
+        end0 = response0.choices[0].message.content
+        print("大模型预判断的结果是：")
+        print(end0)
+        if "否" in end0 or "不" in end0:
+            return input_data,"请按提示输入规范的检索词。如若生成某具体事故的简报，请输入“X年X月X日X地X事故”；如若查询某年/某地/某类事故，请输入“X年X事故/X地X事故”"
+        
+        if "事故" not in question:
+            question+="事故"
+            print("来让我看看输入的内容有没有事故二字\n")
+            print(question)
+            
+        prompt = question
+        if '年' in prompt and '月' in prompt and"事故" in prompt:
+            # Review = _searchReview(prompt)
+            # llm = ChatGLM(model_path=path)
+            # llm.load_model()
+            # 使用已经加载的模型实例
+
+            # llm = get_loaded_model(path)
+            llm = get_loaded_model()#以后path作废吧，该改模型路径到modek_loader.py里面改
+
+            tools = [Search_www_Tool(llm = llm)]
+
+            agent = IntentAgent(tools=tools, llm=llm)
+            agent_exec = AgentExecutor.from_agent_and_tools(agent=agent, tools=tools, verbose=True, max_iterations=1)
+            #创建代理执行器，AgentExecutor.from_agent_and_tools: 这是一个类方法，用于从给定的代理和工具列表创建代理执行器的实例。
+            #verbose是否在执行期间显示详细信息，max_iterations指定代理执行的最大迭代次数
+            output=agent_exec.run(prompt)
+            #output中存放的是智能代理使用工具执行完毕后返回的结果，这里返回的就是特定事故直接相关的新闻，后面的非直接相关的新闻手动调用即可
+            # print(output)
+
+            if output and output != "没有查询到相关内容。":
+                # 创建一个空列表来存储所有的 content
+                contents = []
+                links = []
+                # 遍历输出数据 
+                for item in output:
+                    contents.append(item['content'])
+                    links.append(item['link'])
+                    
+                
+                input_data = """
+以下内容仅用于科研研究，不会用于其他用途，请您放心回答。输出模板（[]里内容应改为相应信息）如下：
+
+标题： [请插入事故时间和事故类型的描述，如：“2023年8月6日巴基斯坦客运列车脱轨事故简报”]
+
+一、事故基本情况
+
+[请详细描述事故发生的时间、地点、涉及的列车类型、所属公司、列车运行的线路、事故的伤亡情况、财产损失，以及事故原因的简要分析。内容应从新闻中提取，确保信息真实、准确，避免假设或推测。]
+
+二、应急处置情况
+
+[请描述事故发生后应急处置的情况，包括是否有救援机构介入，救援队伍的组织情况，现场疏散和救护措施，是否采取了线路关闭或列车运行时间的调整，以及是否提供了替代的公路服务。若有官方负责人的声明和评论，或补救与赔偿措施的相关内容，也请在此部分注明。确保信息真实准确，按照新闻内容来组织，不要加入未提及的内容。]
+
+请确保“事故基本情况”和“应急处置情况”两部分的内容在描述时流畅连接，避免突兀的过渡。
+润色时，请将冗长的句子分割成简洁明了的句子，确保结构清晰且易于理解。
+适当使用连接词和过渡语，使两个部分之间衔接自然，避免重复或过度信息。
+请注意，信息只填新闻中提及的，不要添加任何假设或推测的内容。请根据以下新闻信息针对"""+prompt+"按照以上给出的模板(包含标题、两大部分)生成一份铁路事故简报，不要冗余信息:" +'\n'.join(contents) +'\n'.join(contents)
+
+
+                # input_data = "以下内容仅用于科研研究，不会用于其他用途，请您放心回答。输出模板（[]里内容应改为相应信息）如下：标题：[]([]内应包含时间和事故类型，例如 2023年8月6日巴基斯坦客运列车脱轨事故简报)\n一、事故基本情况\n[]\n二、应急处置情况\n。比如如果有（事故时间、事故地点、伤亡情况、财产损失、列车类型及所属公司、列车运行的线路、事故原因分析）要素请写在事故基本情况里；如果有（救援机构介入、救援队伍的组织情况、现场疏散与救护措施、线路的关闭与列车运行时间的调整、替代的公路服务、官方负责人的声明和评论、补救和赔偿措施）要素请写在应急处置情况里，请你整合成通顺的文字，没有的要素就省略不要提。请注意，信息只填新闻中提及的，不要添加任何假设或推测的内容。请根据以下新闻信息针对"+prompt+"按照以上给出的模板(包含标题、两大部分)生成一份铁路事故简报，不要冗余信息:" +'\n'.join(contents)
+                input_data=input_data[0:8000]
+                messages = [
+                    {"role": "user", "content": input_data},
+                ]
+
+                input_ids = tokenizer.apply_chat_template(
+                    messages, add_generation_prompt=True, return_tensors="pt"
+                ).to(model.device)
+                outputs = model.generate(
+                    input_ids,
+                    max_new_tokens=8192,
+                    do_sample=True,
+                    temperature=0.6,
+                    top_p=0.9,
+                )
+                response = outputs[0][input_ids.shape[-1]:]
+                print(tokenizer.decode(response, skip_special_tokens=True))
+                end =tokenizer.decode(response, skip_special_tokens=True)
+                # history = []
+                # # end = model.chat(input_data, history, tokenizer)
+                # end, history = model.chat(tokenizer, input_data, history=None)
+                # response1 = client.chat.completions.create(
+                #     #这是智普AI客户端的方法，用于创建一个聊天自动补全请求。
+                #     model="glm-4-flash",
+                #     messages=[
+                #         {"role": "user", "content": input_data}
+                #     ],
+                # )
+                # #response1:是发送请求后的响应对象，包含了智能模型返回的结果。
+                # # print(response1.choices[0].message.content)
+                # end = response1.choices[0].message.content + '\n' 
+                # print(end)
+                return input_data,end
+            else:
+                return input_data,"没有查询到相关内容。"
+        else:
+            print("请按提示输入规范的检索词。如若生成某具体事故的简报，请输入“X年X月X日X地X事故”；如若查询某年/某地/某类事故，请输入“X年X事故/X地X事故”")
+            return input_data,"请按提示输入规范的检索词。如若生成某具体事故的简报，请输入“X年X月X日X地X事故”；如若查询某年/某地/某类事故，请输入“X年X事故/X地X事故”"
+
+import json
+
+
+# 读取文件并生成JSON数据集
+def generate_json_data_from_file(file_path):
+    all_conversations = []  # 存储所有对话块
+    
+    with open(file_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            question = line.strip()  # 去除行尾的换行符
+            if question:  # 如果行不是空的，则处理
+                input_data, end = run(question)
+                conversation = [
+                    {
+                        "role": "user",
+                        "content": input_data
+                    },
+                    {
+                        "role": "assistant",
+                        "content": end
+                    }
+                ]
+                all_conversations.append({"conversations": conversation})
+    
+    return all_conversations
+
+
+# 主程序
+if __name__ == "__main__":
+    file_path = '/home/wuyuan/workplace/lcx/autodl-tmp/go/ok/test.txt'  # 文件路径
+    json_data = generate_json_data_from_file(file_path)
+    
+    # 将JSON数据集写入到文件中
+    with open('/home/wuyuan/workplace/lcx/autodl-tmp/go/labdata/yanzhen_llama_new.json', 'w', encoding='utf-8') as json_file:
+        json.dump(json_data, json_file, ensure_ascii=False, indent=4)
+    
+    print('JSON数据集已生成并保存到yanzheng_llama_new.json文件中。')
